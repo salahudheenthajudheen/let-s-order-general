@@ -57,7 +57,7 @@ export default function InventoryList({ user, sellerProfile }) {
       .single();
 
     if (!error && data) {
-      setProducts([data, ...products]);
+      setProducts([{ ...data, seller: { name: sellerProfile?.name } }, ...products]);
       setIsAdding(false);
       setNewName('');
       setNewPrice('');
