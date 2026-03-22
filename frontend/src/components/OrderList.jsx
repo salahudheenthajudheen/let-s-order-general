@@ -1,7 +1,7 @@
 import React from 'react';
 import OrderCard from './OrderCard';
 
-export default function OrderList({ orders, onAccept, onReject, onDispatch, loading }) {
+export default function OrderList({ orders, onAccept, onReject, onDispatch, onDelivered, loading }) {
   if (loading) {
     return (
       <div className="order-list__empty">
@@ -30,6 +30,7 @@ export default function OrderList({ orders, onAccept, onReject, onDispatch, load
           onAccept={onAccept}
           onReject={onReject}
           onDispatch={onDispatch}
+          onDelivered={onDelivered}
         />
       ))}
     </div>

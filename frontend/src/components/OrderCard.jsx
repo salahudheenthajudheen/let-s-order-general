@@ -1,7 +1,7 @@
 import React from 'react';
 import StatusBadge from './StatusBadge';
 
-export default function OrderCard({ order, onAccept, onReject, onDispatch }) {
+export default function OrderCard({ order, onAccept, onReject, onDispatch, onDelivered }) {
   const createdAt = new Date(order.created_at).toLocaleString('en-IN', {
     day: 'numeric',
     month: 'short',
@@ -56,6 +56,14 @@ export default function OrderCard({ order, onAccept, onReject, onDispatch }) {
         <div className="order-card__actions">
           <button className="btn btn--dispatch" onClick={() => onDispatch(order.id)}>
             🚚 Mark Dispatched
+          </button>
+        </div>
+      )}
+
+      {order.status === 'dispatched' && (
+        <div className="order-card__actions">
+          <button className="btn btn--accept" onClick={() => onDelivered(order.id)}>
+            ✅ Mark Delivered
           </button>
         </div>
       )}

@@ -96,6 +96,7 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
   const handleAccept = (id) => updateOrderStatus(id, 'accepted');
   const handleReject = (id) => updateOrderStatus(id, 'rejected');
   const handleDispatch = (id) => updateOrderStatus(id, 'dispatched');
+  const handleDelivered = (id) => updateOrderStatus(id, 'delivered');
 
   return (
     <div className="dashboard">
@@ -187,6 +188,7 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
         onAccept={handleAccept}
         onReject={handleReject}
         onDispatch={handleDispatch}
+        onDelivered={handleDelivered}
       />
         </>
       )}
