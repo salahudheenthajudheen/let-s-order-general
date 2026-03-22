@@ -20,9 +20,9 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
     if (user) initSeller();
   }, [user]);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (silent = false) => {
     if (!sellerProfile) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const query = supabase
       .from('orders')
       .select('*, customer:customers(*), seller:sellers(*)')
@@ -39,7 +39,7 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
     } else {
       setOrders(data || []);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   // Calculate stats
@@ -65,30 +65,8 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
         { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
           console.log('Realtime update:', payload);
-
-          if (payload.eventType === 'INSERT') {
-            if (payload.new.seller_id !== sellerProfile.id) return;
-            setOrders((prev) => {
-              const updated = [payload.new, ...prev];
-              calculateStats(updated);
-              return updated;
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            if (payload.new.seller_id !== sellerProfile.id) return;
-            setOrders((prev) => {
-              const updated = prev.map((o) =>
-                o.id === payload.new.id ? { ...o, ...payload.new } : o
-              );
-              calculateStats(updated);
-              return updated;
-            });
-          } else if (payload.eventType === 'DELETE') {
-            setOrders((prev) => {
-              const updated = prev.filter((o) => o.id !== payload.old.id);
-              calculateStats(updated);
-              return updated;
-            });
-          }
+          // Simply refetch orders silently to grab joined customer/seller names natively from Postgres
+          fetchOrders(true);
         }
       )
       .subscribe();
