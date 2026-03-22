@@ -3,16 +3,25 @@ import { supabase } from "../_shared/supabase.ts";
 import { sendMessage, sendDocument } from "../_shared/telegram.ts";
 import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   if (req.method !== "POST") {
-    return new Response("OK", { status: 200 });
+    return new Response("OK", { status: 200, headers: corsHeaders });
   }
 
   try {
     const { order_id, status } = await req.json();
 
     if (!order_id || !status) {
-      return new Response("Missing order_id or status", { status: 400 });
+      return new Response("Missing order_id or status", { status: 400, headers: corsHeaders });
     }
 
     // Fetch full order context
@@ -24,12 +33,12 @@ Deno.serve(async (req: Request) => {
 
     if (error || !order) {
       console.error("Order fetch error:", error);
-      return new Response("Order not found", { status: 404 });
+      return new Response("Order not found", { status: 404, headers: corsHeaders });
     }
 
     const tgId = order.customer?.telegram_id;
     if (!tgId) {
-      return new Response("No telegram ID attached to customer", { status: 200 });
+      return new Response("No telegram ID attached to customer", { status: 200, headers: corsHeaders });
     }
 
     // Construct status message
@@ -81,10 +90,10 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json" }
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (err: any) {
     console.error("notify-customer error:", err);
-    return new Response(err.message, { status: 500 });
+    return new Response(err.message, { status: 500, headers: corsHeaders });
   }
 });
