@@ -113,3 +113,34 @@ export function inlineButton(
 ): { text: string; callback_data: string } {
   return { text, callback_data: callbackData };
 }
+
+/**
+ * Send a document (PDF, etc)
+ */
+export async function sendDocument(
+  chatId: number,
+  buffer: Uint8Array,
+  filename: string,
+  caption?: string
+): Promise<void> {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  if (caption) {
+    form.append("caption", caption);
+    form.append("parse_mode", "Markdown");
+  }
+  form.append(
+    "document",
+    new Blob([buffer], { type: "application/pdf" }),
+    filename
+  );
+  
+  const res = await fetch(`${TG_API}/sendDocument`, {
+    method: "POST",
+    body: form,
+  });
+  
+  if (!res.ok) {
+    console.error("sendDocument error:", await res.text());
+  }
+}

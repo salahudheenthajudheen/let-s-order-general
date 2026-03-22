@@ -90,7 +90,13 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
     if (error) {
       console.error('Error updating order:', error);
       alert('Failed to update order status');
+      return;
     }
+    
+    // Invoke push notification & invoice generation worker
+    supabase.functions.invoke('notify-customer', {
+      body: { order_id: orderId, status }
+    }).catch(err => console.error("Notification failed:", err));
   };
 
   const handleAccept = (id) => updateOrderStatus(id, 'accepted');

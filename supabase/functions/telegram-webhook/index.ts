@@ -69,9 +69,13 @@ async function getOrCreateCustomer(
     .from("customers")
     .select("*")
     .eq("telegram_id", telegramId)
-    .single();
-
-  if (data) return data;
+  if (data) {
+    if (name && data.name.startsWith("User ")) {
+      await supabase.from("customers").update({ name }).eq("telegram_id", telegramId);
+      data.name = name;
+    }
+    return data;
+  }
 
   const { data: newCustomer } = await supabase
     .from("customers")
@@ -1031,6 +1035,9 @@ Deno.serve(async (req: Request) => {
     if (!msg) return new Response("ok", { status: 200 });
 
     const chatId = msg.chat.id;
+    const name = msg.from?.first_name || msg.from?.username;
+    
+    await getOrCreateCustomer(chatId, name);
 
     // Route by message type
     if (msg.text) {
