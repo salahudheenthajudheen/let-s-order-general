@@ -210,6 +210,18 @@ async function handleStart(chatId: number): Promise<void> {
   const customer = await getOrCreateCustomer(chatId);
   const session = await getSession(chatId);
   const role = session.draft_order?.active_role || "consumer";
+
+  // Enforce name capture before allowing access to any features
+  if (customer.name.startsWith("User ")) {
+    await setSession(chatId, "awaiting_name", session.draft_order);
+    await sendMessage(
+      chatId,
+      "👋 Welcome to Let's Order!\n\nTo get started, please type your *Full Name*:"
+    );
+    return;
+  }
+
+  // Choose layout based on role
   await setSession(chatId, "idle", session.draft_order);
 
   if (role === "admin") {
@@ -373,7 +385,7 @@ async function handleHelp(chatId: number): Promise<void> {
       `*How to order:*\n` +
       `🎤 *Voice:* Send a voice message like _"2 kg chawal"_\n` +
       `✍️ *Text:* Type _"order 5 kg rice"_\n` +
-      `📋 *Wizard:* Use /order for step-by-step guidance\n\n` +
+      `📋 *Wizard:* Use /order for guided ordering\n\n` +
       `🌍 *Supported Languages:*\n` +
       `Hindi, Tamil, Malayalam, Telugu, Kannada, Bengali, Marathi, Gujarati, Punjabi, English`
   );
@@ -510,6 +522,23 @@ async function handleVoice(
 
 async function handleText(chatId: number, text: string): Promise<void> {
   const session = await getSession(chatId);
+
+  // 1. Mandatory Name Onboarding
+  if (session.state === "awaiting_name") {
+    const name = text.trim();
+    if (name.length < 2) {
+      await sendMessage(chatId, "Please enter a valid name:");
+      return;
+    }
+    
+    // Save to Postgres
+    await supabase.from("customers").update({ name }).eq("telegram_id", chatId);
+    
+    // Return to start
+    await setSession(chatId, "idle", session.draft_order);
+    await handleStart(chatId);
+    return;
+  }
 
   switch (session.state) {
     case "awaiting_product":
