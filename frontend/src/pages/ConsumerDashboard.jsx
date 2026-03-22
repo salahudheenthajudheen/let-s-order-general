@@ -11,6 +11,24 @@ export default function ConsumerDashboard({ user, onLogout, roleSwitcher }) {
   useEffect(() => {
     fetchProducts();
     if (activeTab === 'orders') fetchMyOrders();
+
+    const channel = supabase
+      .channel('consumer-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => fetchProducts()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => { if (activeTab === 'orders') fetchMyOrders(); }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [activeTab]);
 
   const fetchProducts = async () => {
@@ -19,7 +37,17 @@ export default function ConsumerDashboard({ user, onLogout, roleSwitcher }) {
       .from('products')
       .select('*, seller:sellers(name)')
       .order('name');
-    if (data) setProducts(data);
+    
+    if (data) {
+      // Group products by seller
+      const grouped = {};
+      data.forEach(p => {
+        const sName = p.seller?.name || 'Unknown Seller';
+        if (!grouped[sName]) grouped[sName] = [];
+        grouped[sName].push(p);
+      });
+      setProducts(grouped);
+    }
     setLoading(false);
   };
 
@@ -125,19 +153,25 @@ export default function ConsumerDashboard({ user, onLogout, roleSwitcher }) {
 
       <main className="luminous-content">
         {activeTab === 'browse' && (
-          <>
-            <h2 style={{ marginBottom: '24px', fontSize: '28px' }}>Summer Essentials</h2>
-            <div className="luminous-grid">
-              {products.map(p => (
-                <div key={p.id} className="luminous-card">
-                  <h3 style={{ fontSize: '20px' }}>{p.name}</h3>
-                  <span style={{ color: 'var(--lum-text-secondary)', fontSize: '14px' }}>Sold by: {p.seller?.name || 'Unknown'}</span>
-                  <div className="luminous-price">₹{p.price}</div>
-                  <button className="luminous-btn" onClick={() => addToCart(p)}>Add to Cart</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+            {Object.keys(products).map(sellerName => (
+              <div key={sellerName}>
+                <h2 style={{ marginBottom: '24px', fontSize: '28px' }}>🛍 {sellerName}</h2>
+                <div className="luminous-grid">
+                  {products[sellerName].map(p => (
+                    <div key={p.id} className="luminous-card">
+                      <h3 style={{ fontSize: '20px' }}>{p.name}</h3>
+                      <div className="luminous-price">₹{p.price}</div>
+                      <button className="luminous-btn" onClick={() => addToCart(p)}>Add to Cart</button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </>
+              </div>
+            ))}
+            {Object.keys(products).length === 0 && !loading && (
+              <p style={{ color: 'var(--lum-text-secondary)' }}>No products available at the moment.</p>
+            )}
+          </div>
         )}
 
         {activeTab === 'cart' && (

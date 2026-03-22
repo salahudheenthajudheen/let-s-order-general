@@ -10,13 +10,23 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [stats, setStats] = useState({ total: 0, pending: 0, accepted: 0, delivered: 0 });
+  const [sellerProfile, setSellerProfile] = useState(null);
+
+  useEffect(() => {
+    async function initSeller() {
+      const { data } = await supabase.from('sellers').select('*').eq('user_id', user.id).single();
+      if (data) setSellerProfile(data);
+    }
+    if (user) initSeller();
+  }, [user]);
 
   const fetchOrders = async () => {
+    if (!sellerProfile) return;
     setLoading(true);
     const query = supabase
       .from('orders')
       .select('*, customer:customers(*), seller:sellers(*)')
-      .eq('seller_id', user.id)
+      .eq('seller_id', sellerProfile.id)
       .order('created_at', { ascending: false });
 
     if (filter !== 'all') {
@@ -45,6 +55,7 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
 
   // Realtime subscription
   useEffect(() => {
+    if (!sellerProfile) return;
     fetchOrders();
 
     const channel = supabase
@@ -56,12 +67,14 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
           console.log('Realtime update:', payload);
 
           if (payload.eventType === 'INSERT') {
+            if (payload.new.seller_id !== sellerProfile.id) return;
             setOrders((prev) => {
               const updated = [payload.new, ...prev];
               calculateStats(updated);
               return updated;
             });
           } else if (payload.eventType === 'UPDATE') {
+            if (payload.new.seller_id !== sellerProfile.id) return;
             setOrders((prev) => {
               const updated = prev.map((o) =>
                 o.id === payload.new.id ? { ...o, ...payload.new } : o
@@ -83,7 +96,7 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [filter]);
+  }, [filter, sellerProfile]);
 
   useEffect(() => {
     calculateStats(orders);
@@ -138,8 +151,8 @@ export default function Dashboard({ user, onLogout, roleSwitcher }) {
         ))}
       </div>
 
-      {activeTab === 'inventory' && <InventoryList user={user} />}
-      {activeTab === 'analytics' && <Analytics user={user} />}
+      {activeTab === 'inventory' && <InventoryList user={user} sellerProfile={sellerProfile} />}
+      {activeTab === 'analytics' && <Analytics user={user} sellerProfile={sellerProfile} />}
 
       {activeTab === 'orders' && (
         <>

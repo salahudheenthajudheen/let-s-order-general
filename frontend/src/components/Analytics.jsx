@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function Analytics({ user }) {
+export default function Analytics({ user, sellerProfile }) {
   const [stats, setStats] = useState({ revenue: 0, topProducts: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
+      if (!sellerProfile) return;
       setLoading(true);
       // Fetch all delivered orders for revenue
       const { data: orders, error } = await supabase
         .from('orders')
         .select('*')
         .eq('status', 'delivered')
-        .eq('seller_id', user.id);
+        .eq('seller_id', sellerProfile.id);
 
       if (!error && orders) {
         let totalRev = 0;

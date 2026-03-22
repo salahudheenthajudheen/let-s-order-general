@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function InventoryList({ user }) {
+export default function InventoryList({ user, sellerProfile }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
@@ -17,7 +17,7 @@ export default function InventoryList({ user }) {
     const { data, error } = await supabase
       .from('products')
       .select('*, seller:sellers(name)')
-      .eq('seller_id', user.id)
+      .eq('seller_id', sellerProfile?.id)
       .order('name');
       
     if (!error && data) {
@@ -51,7 +51,7 @@ export default function InventoryList({ user }) {
         name: newName,
         price: parseFloat(newPrice),
         stock: parseInt(newStock, 10),
-        seller_id: user.id 
+        seller_id: sellerProfile?.id 
       })
       .select()
       .single();
