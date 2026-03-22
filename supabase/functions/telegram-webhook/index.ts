@@ -233,6 +233,7 @@ async function handleStart(chatId: number): Promise<void> {
         customer.name ? ` ${customer.name}` : ""
       }! I'm your voice-enabled shopping assistant.\n\n🎤 Send a *voice message* to order\n✍️ Type what you want\n📋 Use commands to navigate\n\n🌍 _Supports Hindi, Tamil, Malayalam & more!_`,
       [
+        [inlineButton("🏬 Browse Sellers", "cmd_sellers")],
         [inlineButton("🛒 Start Ordering", "cmd_order")],
         [
           inlineButton("📦 My Orders", "cmd_status"),
@@ -448,7 +449,7 @@ async function handleVoice(
       });
 
       totalPrice += itemTotal;
-      summaryText += `📦 *${best.product.name}* (x${qty}) - ₹${itemTotal}\n`;
+      summaryText += `📦 *${best.product.name}* (x${qty}) from _${best.seller.name}_ - ₹${itemTotal}\n`;
       ttsSummaryText += `${qty} ${best.product.name}, `;
     }
   }
@@ -551,6 +552,32 @@ async function handleText(chatId: number, text: string): Promise<void> {
       return;
     }
 
+    if (matches.length > 1) {
+      // Disambiguate if there are multiple distinct sellers
+      const uniqueSellers = Array.from(new Map(matches.map(m => [m.seller.id, m])).values());
+      if (uniqueSellers.length > 1) {
+        await setSession(chatId, "awaiting_seller", {
+          parsed_product: parsed.product,
+          parsed_qty: parsed.quantity || 1,
+          matches: matches.map(m => ({ 
+            product_id: m.product.id, 
+            seller_id: m.seller.id, 
+            price: m.product.price, 
+            product_name: m.product.name, 
+            seller_name: m.seller.name 
+          }))
+        });
+        
+        const btns = uniqueSellers.map(m => [inlineButton(`🏬 ${m.seller.name} (₹${m.product.price})`, `seller_ch_${m.seller.id}`)]);
+        await sendInlineKeyboard(
+          chatId, 
+          `🤔 Multiple distinct sellers carry *${parsed.product}*.\n\nPlease choose which shop you want to order it from:`, 
+          btns
+        );
+        return;
+      }
+    }
+
     const best = matches[0];
     const qty = parsed.quantity || 1;
     const totalPrice = qty * (best.product.price || 0);
@@ -611,7 +638,6 @@ async function handleAwaitingProduct(
   const matches = await findProducts(parsed.product);
 
   if (matches.length === 0) {
-    // Show available products
     const { data: allProducts } = await supabase
       .from("products")
       .select("name, price")
@@ -629,8 +655,32 @@ async function handleAwaitingProduct(
     return;
   }
 
+  if (matches.length > 1) {
+    const uniqueSellers = Array.from(new Map(matches.map(m => [m.seller.id, m])).values());
+    if (uniqueSellers.length > 1) {
+      await setSession(chatId, "awaiting_seller", {
+        parsed_product: parsed.product,
+        parsed_qty: parsed.quantity || 1,
+        matches: matches.map(m => ({ 
+          product_id: m.product.id, 
+          seller_id: m.seller.id, 
+          price: m.product.price, 
+          product_name: m.product.name, 
+          seller_name: m.seller.name 
+        }))
+      });
+      
+      const btns = uniqueSellers.map(m => [inlineButton(`🏬 ${m.seller.name} (₹${m.product.price})`, `seller_ch_${m.seller.id}`)]);
+      await sendInlineKeyboard(
+        chatId, 
+        `🤔 Multiple distinct sellers carry *${parsed.product}*.\n\nPlease choose which shop you want to order it from:`, 
+        btns
+      );
+      return;
+    }
+  }
+
   if (parsed.quantity) {
-    // Have both product and quantity — go to confirmation
     const best = matches[0];
     const totalPrice = parsed.quantity * (best.product.price || 0);
 
@@ -662,7 +712,6 @@ async function handleAwaitingProduct(
       ]
     );
   } else {
-    // Have product but need quantity
     const best = matches[0];
     await setSession(chatId, "awaiting_quantity", {
       product_id: best.product.id,
@@ -750,7 +799,7 @@ async function confirmOrder(
       status: "pending",
     });
     totalCombined += item.total || 0;
-    summaryText += `📦 *${item.product_name}* × ${item.quantity} (₹${item.total})\n`;
+    summaryText += `📦 *${item.product_name}* × ${item.quantity} from _${item.seller_name}_ (₹${item.total})\n`;
   }
 
   const { error } = await supabase.from("orders").insert(inserts);
@@ -776,6 +825,43 @@ async function confirmOrder(
   );
 }
 
+// ─── Seller & Product Browsing ───────────────────────────────────
+
+async function handleBrowseSellers(chatId: number): Promise<void> {
+  const { data: sellers } = await supabase.from('sellers').select('*').eq('is_available', true);
+  if (!sellers || sellers.length === 0) {
+    await sendMessage(chatId, "🏬 No sellers are currently available in your area.");
+    return;
+  }
+  
+  const buttons = sellers.map((s: any) => [inlineButton(`🏬 ${s.name} (${s.location_name})`, `seller_view_${s.id}`)]);
+  await sendInlineKeyboard(
+    chatId, 
+    "🏬 *Available Sellers:*\n\nSelect a shop to browse their full catalog:", 
+    buttons
+  );
+}
+
+async function handleSellerView(chatId: number, sellerId: string): Promise<void> {
+  const { data: seller } = await supabase.from('sellers').select('*').eq('id', sellerId).single();
+  if (!seller) return;
+
+  const { data: products } = await supabase.from('products').select('*').eq('seller_id', sellerId).gt('stock', 0);
+  
+  if (!products || products.length === 0) {
+    await sendMessage(chatId, `🏬 *${seller.name}* currently has no products in stock.`);
+    return;
+  }
+  
+  let msg = `🏬 *${seller.name}* (${seller.location_name})\n\n`;
+  products.forEach((p: any) => {
+    msg += `• *${p.name}* — ₹${p.price} (${p.stock} left)\n`;
+  });
+  
+  msg += `\n✍️ Type the name of the product you want to order.`;
+  await sendMessage(chatId, msg);
+}
+
 // ─── Callback Query Handler ────────────────────────────────────────
 
 async function handleCallback(
@@ -787,6 +873,10 @@ async function handleCallback(
   const session = await getSession(chatId);
 
   switch (data) {
+    case "cmd_sellers":
+      await handleBrowseSellers(chatId);
+      break;
+
     case "cmd_order":
       await handleOrder(chatId);
       break;
@@ -872,6 +962,46 @@ async function handleCallback(
         const session = await getSession(chatId);
         await setSession(chatId, session.state, { ...session.draft_order, active_role: role });
         await sendMessage(chatId, `✅ Identity switched to *${role.toUpperCase()}*.\n\nSend /start to reload menus.`);
+      } else if (data.startsWith("seller_view_")) {
+        const sid = data.replace("seller_view_", "");
+        await handleSellerView(chatId, sid);
+      } else if (data.startsWith("seller_ch_")) {
+        const sid = data.replace("seller_ch_", "");
+        const session = await getSession(chatId);
+        if (session.state === "awaiting_seller" && session.draft_order) {
+           const match = session.draft_order.matches.find((m: any) => String(m.seller_id) === sid);
+           if (match) {
+             const qty = session.draft_order.parsed_qty;
+             const totalPrice = qty * match.price;
+             await setSession(chatId, "confirming", {
+               product_id: match.product_id,
+               product_name: match.product_name,
+               seller_id: match.seller_id,
+               seller_name: match.seller_name,
+               quantity: qty,
+               price: match.price,
+               total: totalPrice
+             });
+             
+             await sendInlineKeyboard(
+               chatId,
+               `🛒 *Order Summary:*\n\n` +
+                 `📦 *${match.product_name}*\n` +
+                 `🔢 Quantity: *${qty}*\n` +
+                 `💰 Price: ₹${match.price} each\n` +
+                 `💵 Total: *₹${totalPrice}*\n` +
+                 `🏪 Seller: ${match.seller_name}\n\n` +
+                 `Confirm this order?`,
+               [
+                 [
+                   inlineButton("✅ Confirm", "order_confirm"),
+                   inlineButton("✏️ Edit", "order_edit"),
+                   inlineButton("❌ Cancel", "order_cancel"),
+                 ],
+               ]
+             );
+           }
+        }
       }
       break;
   }
