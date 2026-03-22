@@ -125,94 +125,131 @@ export default function ConsumerDashboard({ user, onLogout, roleSwitcher }) {
   const cartTotal = cart.reduce((acc, item) => acc + (item.product.price * item.qty), 0);
 
   return (
-    <div className="luminous-theme">
-      <header className="luminous-header">
-        <div>
-          <h1>The Atrium Shop</h1>
+    <div className="dashboard-layout">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar__header">
+          <div className="logo-placeholder">🛍️</div>
+          <h2>Let's Order</h2>
+          <div className="role-badge" style={{background: 'var(--accent)', color: 'white'}}>Consumer</div>
         </div>
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+
+        <nav className="sidebar__nav">
+          <button
+            className={`nav-item ${activeTab === 'browse' ? 'nav-item--active' : ''}`}
+            onClick={() => setActiveTab('browse')}
+          >
+            <span className="nav-item__icon">🛍</span> Browse Catalog
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'cart' ? 'nav-item--active' : ''}`}
+            onClick={() => setActiveTab('cart')}
+          >
+            <span className="nav-item__icon">🛒</span> Cart ({cart.length})
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'orders' ? 'nav-item--active' : ''}`}
+            onClick={() => setActiveTab('orders')}
+          >
+            <span className="nav-item__icon">📦</span> My Orders
+          </button>
+        </nav>
+
+        <div className="sidebar__footer">
           {roleSwitcher}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ color: 'var(--lum-text-secondary)', fontSize: '14px', fontWeight: '500' }}>{user?.email}</span>
-            <button className="btn btn--ghost" style={{ color: 'var(--lum-primary)', borderColor: 'var(--lum-primary)' }} onClick={onLogout}>Sign Out</button>
+          <div className="user-info" style={{ marginTop: '16px' }}>
+            <span className="user-email" style={{fontSize: '14px', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px'}}>{user?.email}</span>
+            <button className="btn btn--default" style={{width: '100%', color: '#ff4d4f', borderColor: '#ff4d4f'}} onClick={onLogout}>Sign Out</button>
           </div>
         </div>
-      </header>
+      </aside>
 
-      <div className="luminous-tabs">
-        {['browse', 'cart', 'orders'].map((tab) => (
-          <button
-            key={tab}
-            className={`luminous-tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab === 'browse' ? '🛍 Browse Catalog' : tab === 'cart' ? `🛒 Cart (${cart.length})` : '📦 My Orders'}
-          </button>
-        ))}
-      </div>
+      {/* Main Content */}
+      <main className="main-content">
+        <header className="page-header">
+          <div>
+            <h1>The Atrium Shop</h1>
+            <p className="text-secondary" style={{ marginTop: '8px' }}>Discover products from your favorite native sellers.</p>
+          </div>
+        </header>
 
-      <main className="luminous-content">
         {activeTab === 'browse' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+          <div className="catalog-view" style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
             {Object.keys(products).map(sellerName => (
               <div key={sellerName}>
-                <h2 style={{ marginBottom: '24px', fontSize: '28px' }}>🛍 {sellerName}</h2>
-                <div className="luminous-grid">
+                <h2 style={{ marginBottom: '20px', fontSize: '24px', fontWeight: '600', color: 'var(--text-main)' }}>🏪 {sellerName}</h2>
+                <div className="products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '24px' }}>
                   {products[sellerName].map(p => (
-                    <div key={p.id} className="luminous-card">
-                      <h3 style={{ fontSize: '20px' }}>{p.name}</h3>
-                      <div className="luminous-price">₹{p.price}</div>
-                      <button className="luminous-btn" onClick={() => addToCart(p)}>Add to Cart</button>
+                    <div key={p.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '24px' }}>
+                      <div>
+                        <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-main)' }}>{p.name}</h3>
+                        <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--primary)', marginBottom: '24px' }}>₹{p.price}</div>
+                      </div>
+                      <button className="btn btn--primary" onClick={() => addToCart(p)}>Add to Cart</button>
                     </div>
                   ))}
                 </div>
               </div>
             ))}
             {Object.keys(products).length === 0 && !loading && (
-              <p style={{ color: 'var(--lum-text-secondary)' }}>No products available at the moment.</p>
+              <div className="card empty-state">
+                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>No products available at the moment.</p>
+              </div>
             )}
           </div>
         )}
 
         {activeTab === 'cart' && (
-          <div className="luminous-cart-view">
-            <h2 style={{ marginBottom: '32px', fontSize: '32px' }}>Shopping Cart</h2>
-            {cart.length === 0 ? <p style={{ color: 'var(--lum-text-secondary)' }}>Your cart is empty and waiting for items.</p> : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {cart.map((item, idx) => (
-                  <div key={idx} className="luminous-cart-item">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <strong style={{ fontSize: '18px', color: 'var(--lum-text-main)' }}>{item.product.name}</strong>
-                      <span style={{ color: 'var(--lum-text-secondary)' }}>₹{item.product.price} × {item.qty}</span>
+          <div className="cart-view" style={{ maxWidth: '800px' }}>
+            <h2 style={{ marginBottom: '24px', fontSize: '28px', color: 'var(--text-main)' }}>Shopping Cart</h2>
+            {cart.length === 0 ? (
+              <div className="card empty-state" style={{ padding: '60px', textAlign: 'center' }}>
+                <div style={{ fontSize: '48px', opacity: 0.5, marginBottom: '16px' }}>🛒</div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '18px' }}>Your cart is empty and waiting for items.</p>
+              </div>
+            ) : (
+              <div className="card" style={{ padding: '32px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {cart.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <strong style={{ fontSize: '18px', color: 'var(--text-main)' }}>{item.product.name}</strong>
+                        <span style={{ color: 'var(--text-secondary)' }}>₹{item.product.price} × {item.qty}</span>
+                      </div>
+                      <strong style={{ fontSize: '20px', color: 'var(--text-main)' }}>₹{item.product.price * item.qty}</strong>
                     </div>
-                    <strong style={{ fontSize: '20px', color: 'var(--lum-text-main)' }}>₹{item.product.price * item.qty}</strong>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '24px', fontWeight: '800', marginTop: '32px', color: 'var(--lum-text-main)' }}>
-                  <span>Total:</span>
-                  <span>₹{cartTotal}</span>
+                  ))}
                 </div>
-                <button className="luminous-btn" style={{ marginTop: '40px', width: '100%', padding: '18px', fontSize: '18px' }} onClick={placeOrder}>Confirm and Place Order</button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '24px', fontWeight: '800', marginTop: '32px', color: 'var(--text-main)' }}>
+                  <span>Total Payload:</span>
+                  <span style={{ color: 'var(--primary)' }}>₹{cartTotal}</span>
+                </div>
+                <button className="btn btn--primary" style={{ marginTop: '32px', width: '100%', padding: '16px', fontSize: '18px' }} onClick={placeOrder}>Confirm and Place Order</button>
               </div>
             )}
           </div>
         )}
 
         {activeTab === 'orders' && (
-          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-            <h2 style={{ marginBottom: '32px', fontSize: '32px' }}>Order History</h2>
-            {myOrders.length === 0 ? <p style={{ color: 'var(--lum-text-secondary)' }}>You haven't placed any orders yet.</p> : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="orders-view" style={{ maxWidth: '800px' }}>
+            <h2 style={{ marginBottom: '24px', fontSize: '28px', color: 'var(--text-main)' }}>Order History</h2>
+            {myOrders.length === 0 ? (
+              <div className="card empty-state" style={{ padding: '60px', textAlign: 'center' }}>
+                <div style={{ fontSize: '48px', opacity: 0.5, marginBottom: '16px' }}>📦</div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '18px' }}>You haven't placed any orders yet.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {myOrders.map(o => (
-                  <div key={o.id} className="luminous-order-item">
+                  <div key={o.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px' }}>
                     <div>
-                      <strong style={{ fontSize: '18px', color: 'var(--lum-text-main)' }}>{o.product} (×{o.quantity})</strong>
-                      <div style={{ color: 'var(--lum-text-secondary)', marginTop: '8px' }}>From: {o.seller?.name || 'Unknown Seller'}</div>
-                      <div style={{ color: 'var(--lum-text-secondary)', marginTop: '4px', fontSize: '14px' }}>{new Date(o.created_at).toLocaleDateString()}</div>
+                      <strong style={{ fontSize: '18px', color: 'var(--text-main)' }}>{o.product} <span style={{ color: 'var(--primary)' }}>(×{o.quantity})</span></strong>
+                      <div style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>From: {o.seller?.name || 'Unknown Seller'}</div>
+                      <div style={{ color: 'var(--text-secondary)', marginTop: '4px', fontSize: '14px' }}>{new Date(o.created_at).toLocaleDateString()}</div>
                     </div>
                     <div>
-                      <span style={{ background: 'var(--lum-surface-low)', color: 'var(--lum-primary)', padding: '8px 16px', borderRadius: '99px', fontWeight: '600', textTransform: 'capitalize', fontSize: '14px' }}>
-                        {o.status}
+                      <span className={`status-badge status-badge--${o.status}`}>
+                        {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
                       </span>
                     </div>
                   </div>
