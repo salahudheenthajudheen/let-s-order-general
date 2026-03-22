@@ -59,33 +59,118 @@ Deno.serve(async (req: Request) => {
 
     // If delivered, generate and send PDF Invoice
     if (status === "delivered") {
-      // 1. Create a new PDFDocument
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([600, 400]);
+      // Fetch product price dynamically since order table only stores name and quantity
+      let fetchedRate = 50; // Fallback
+      if (order.seller_id && order.product) {
+        const { data: prodData } = await supabase
+          .from("products")
+          .select("price")
+          .eq("name", order.product)
+          .eq("seller_id", order.seller_id)
+          .single();
+        if (prodData && prodData.price) {
+          fetchedRate = Number(prodData.price);
+        }
+      }
 
+      const pdfDoc = await PDFDocument.create();
+      // standard A4 size is [595.28, 841.89]
+      const page = pdfDoc.addPage([595.28, 841.89]);
       const { width, height } = page.getSize();
       
-      page.drawText(`INVOICE RECEIPT`, { x: 50, y: height - 50, size: 24, color: rgb(0, 0, 0) });
-      page.drawText(`Order ID: #${order.id.split('-')[0]}`, { x: 50, y: height - 90, size: 12 });
-      page.drawText(`Date: ${new Date().toLocaleDateString()}`, { x: 50, y: height - 110, size: 12 });
+      const black = rgb(0,0,0);
+      const gray = rgb(0.3,0.3,0.3);
       
-      page.drawText(`Seller: ${order.seller?.name || 'Local Seller'}`, { x: 50, y: height - 150, size: 14 });
-      page.drawText(`Customer: ${order.customer?.name || 'Valued Customer'}`, { x: 50, y: height - 170, size: 14 });
+      // Header
+      page.drawText(`TAX INVOICE`, { x: 230, y: height - 50, size: 20, color: black });
       
-      page.drawText(`Items:`, { x: 50, y: height - 210, size: 14 });
-      page.drawText(`- ${order.quantity}x ${order.product}`, { x: 70, y: height - 230, size: 12 });
-      
-      page.drawText(`Thank you for doing business with us!`, { x: 50, y: height - 300, size: 14, color: rgb(0, 0.5, 0) });
+      page.drawLine({
+        start: { x: 40, y: height - 70 },
+        end: { x: width - 40, y: height - 70 },
+        thickness: 1,
+        color: rgb(0.8, 0.8, 0.8),
+      });
 
-      // Serialize the PDFDocument to bytes (a Uint8Array)
+      // Seller Details
+      page.drawText(`Sold By:`, { x: 40, y: height - 90, size: 10, color: gray });
+      page.drawText(order.seller?.name || 'Local Seller', { x: 40, y: height - 105, size: 12, color: black });
+      page.drawText(`GSTIN: 29ABCDE1234F1Z5`, { x: 40, y: height - 120, size: 10, color: gray }); // Placeholder standard GST format
+      page.drawText(`Bangalore, India`, { x: 40, y: height - 135, size: 10, color: gray });
+
+      // Buyer Details
+      page.drawText(`Billed To:`, { x: width / 2, y: height - 90, size: 10, color: gray });
+      page.drawText(order.customer?.name || 'Valued Customer', { x: width / 2, y: height - 105, size: 12, color: black });
+      page.drawText(`Contact: ${order.customer?.phone || 'N/A'}`, { x: width / 2, y: height - 120, size: 10, color: gray });
+
+      // Invoice Meta
+      const invNo = `INV-${order.id.split('-')[0].toUpperCase()}`;
+      page.drawText(`Invoice No: ${invNo}`, { x: width - 200, y: height - 90, size: 10, color: black });
+      page.drawText(`Date: ${new Date().toLocaleDateString()}`, { x: width - 200, y: height - 105, size: 10, color: black });
+      page.drawText(`Place of Supply: 29-Karnataka`, { x: width - 200, y: height - 120, size: 10, color: black });
+
+      // Table Header (using a drawn border instead of a filled rectangle to avoid missing method issues)
+      const tabY = height - 175;
+      page.drawText(`Sl No.`, { x: 45, y: tabY, size: 10, color: black });
+      page.drawText(`Description of Goods`, { x: 90, y: tabY, size: 10, color: black });
+      page.drawText(`HSN/SAC`, { x: 280, y: tabY, size: 10, color: black });
+      page.drawText(`Qty`, { x: 350, y: tabY, size: 10, color: black });
+      page.drawText(`Rate`, { x: 400, y: tabY, size: 10, color: black });
+      page.drawText(`Amount (INR)`, { x: 470, y: tabY, size: 10, color: black });
+
+      // Table Row
+      const rowY = height - 200;
+      const rate = fetchedRate;
+      const amount = order.quantity * rate;
+      page.drawText(`1`, { x: 45, y: rowY, size: 10, color: black });
+      page.drawText(order.product, { x: 90, y: rowY, size: 10, color: black });
+      page.drawText(`9900`, { x: 280, y: rowY, size: 10, color: black });
+      page.drawText(`${order.quantity}`, { x: 350, y: rowY, size: 10, color: black });
+      page.drawText(`Rs. ${rate}`, { x: 400, y: rowY, size: 10, color: black });
+      page.drawText(`Rs. ${amount}`, { x: 470, y: rowY, size: 10, color: black });
+
+      // Table Border lines
+      page.drawLine({ start: { x: 40, y: height - 160 }, end: { x: width - 40, y: height - 160 }, thickness: 1, color: gray }); // top of header
+      page.drawLine({ start: { x: 40, y: height - 180 }, end: { x: width - 40, y: height - 180 }, thickness: 1, color: gray }); // bottom of header
+      page.drawLine({ start: { x: 40, y: height - 210 }, end: { x: width - 40, y: height - 210 }, thickness: 1, color: gray }); // bottom of row
+      
+      // Totals
+      // GST calculation (assumed 5% total)
+      const cgst = amount * 0.025;
+      const sgst = amount * 0.025;
+      const total = amount + cgst + sgst;
+      
+      let totY = height - 230;
+      page.drawText(`Taxable Value:`, { x: 350, y: totY, size: 10, color: black });
+      page.drawText(`Rs. ${amount.toFixed(2)}`, { x: 470, y: totY, size: 10, color: black });
+      
+      totY -= 15;
+      page.drawText(`CGST @ 2.5%:`, { x: 350, y: totY, size: 10, color: black });
+      page.drawText(`Rs. ${cgst.toFixed(2)}`, { x: 470, y: totY, size: 10, color: black });
+      
+      totY -= 15;
+      page.drawText(`SGST @ 2.5%:`, { x: 350, y: totY, size: 10, color: black });
+      page.drawText(`Rs. ${sgst.toFixed(2)}`, { x: 470, y: totY, size: 10, color: black });
+
+      totY -= 20;
+      page.drawLine({ start: { x: 350, y: totY + 10 }, end: { x: width - 40, y: totY + 10 }, thickness: 1, color: black });
+      page.drawText(`Grand Total:`, { x: 350, y: totY - 5, size: 12, color: black });
+      page.drawText(`Rs. ${total.toFixed(2)}`, { x: 470, y: totY - 5, size: 12, color: black });
+
+      // Footer
+      page.drawText(`DECLARATION`, { x: 40, y: 150, size: 10, color: black });
+      page.drawText(`We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.`, { x: 40, y: 135, size: 8, color: gray });
+      
+      page.drawText(`Authorized Signatory`, { x: width - 150, y: 100, size: 10, color: black });
+      page.drawLine({ start: { x: width - 160, y: 112 }, end: { x: width - 40, y: 112 }, thickness: 1, color: black });
+
+      page.drawText(`This is a computer generated invoice. No signature required.`, { x: 150, y: 50, size: 8, color: gray });
+
       const pdfBytes = await pdfDoc.save();
-
-      // Send the document via Telegram
       await sendDocument(
         tgId,
         pdfBytes,
-        `Invoice_${order.id.split('-')[0]}.pdf`,
-        `📄 Here is your official invoice for this delivery.`
+        `Tax_Invoice_${invNo}.pdf`,
+        `📄 Your order has been delivered! Attached is your official Tax Invoice.`
       );
     }
 
