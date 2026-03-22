@@ -52,18 +52,18 @@ export default function ConsumerDashboard({ user, onLogout, roleSwitcher }) {
   };
 
   const fetchMyOrders = async () => {
-    // Resolve customer row
-    const { data: customer } = await supabase
+    // Resolve customer rows: match Web Profile (name) OR Linked Telegram Profile (phone)
+    const { data: customerRows } = await supabase
       .from('customers')
-      .select('*')
-      .eq('name', user.email)
-      .single();
+      .select('id')
+      .or(`name.eq."${user.email}",phone.eq."${user.email}"`);
 
-    if (customer) {
+    if (customerRows && customerRows.length > 0) {
+      const customerIds = customerRows.map(c => c.id);
       const { data } = await supabase
         .from('orders')
         .select('*, seller:sellers(name)')
-        .eq('customer_id', customer.id)
+        .in('customer_id', customerIds)
         .order('created_at', { ascending: false });
       if (data) setMyOrders(data);
     }
@@ -115,6 +115,7 @@ export default function ConsumerDashboard({ user, onLogout, roleSwitcher }) {
     if (!error) {
       alert("Order placed successfully!");
       setCart([]);
+      await fetchMyOrders();
       setActiveTab('orders');
     } else {
       alert("Failed to place order.");
@@ -125,140 +126,155 @@ export default function ConsumerDashboard({ user, onLogout, roleSwitcher }) {
   const cartTotal = cart.reduce((acc, item) => acc + (item.product.price * item.qty), 0);
 
   return (
-    <div className="dashboard-layout">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar__header">
-          <div className="logo-placeholder">🛍️</div>
-          <h2>Let's Order</h2>
-          <div className="role-badge" style={{background: 'var(--accent)', color: 'white'}}>Consumer</div>
+    <div className="dashboard-layout dashboard">
+      <header className="dashboard__header">
+        <div className="dashboard__header-left">
+          <h1>🛍️ The Atrium Shop</h1>
+          <span className="dashboard__subtitle">Consumer Portal</span>
         </div>
-
-        <nav className="sidebar__nav">
-          <button
-            className={`nav-item ${activeTab === 'browse' ? 'nav-item--active' : ''}`}
-            onClick={() => setActiveTab('browse')}
-          >
-            <span className="nav-item__icon">🛍</span> Browse Catalog
-          </button>
-          <button
-            className={`nav-item ${activeTab === 'cart' ? 'nav-item--active' : ''}`}
-            onClick={() => setActiveTab('cart')}
-          >
-            <span className="nav-item__icon">🛒</span> Cart ({cart.length})
-          </button>
-          <button
-            className={`nav-item ${activeTab === 'orders' ? 'nav-item--active' : ''}`}
-            onClick={() => setActiveTab('orders')}
-          >
-            <span className="nav-item__icon">📦</span> My Orders
-          </button>
-        </nav>
-
-        <div className="sidebar__footer">
+        <div className="dashboard__header-right">
           {roleSwitcher}
-          <div className="user-info" style={{ marginTop: '16px' }}>
-            <span className="user-email" style={{fontSize: '14px', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px'}}>{user?.email}</span>
-            <button className="btn btn--default" style={{width: '100%', color: '#ff4d4f', borderColor: '#ff4d4f'}} onClick={onLogout}>Sign Out</button>
+          <div className="dashboard__user">
+            <span className="dashboard__user-email">{user?.email}</span>
+            <button className="btn btn--ghost" onClick={onLogout}>Sign Out</button>
           </div>
         </div>
-      </aside>
+      </header>
 
-      {/* Main Content */}
-      <main className="main-content">
-        <header className="page-header">
-          <div>
-            <h1>The Atrium Shop</h1>
-            <p className="text-secondary" style={{ marginTop: '8px' }}>Discover products from your favorite native sellers.</p>
-          </div>
-        </header>
-
-        {activeTab === 'browse' && (
-          <div className="catalog-view" style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
-            {Object.keys(products).map(sellerName => (
-              <div key={sellerName}>
-                <h2 style={{ marginBottom: '20px', fontSize: '24px', fontWeight: '600', color: 'var(--text-main)' }}>🏪 {sellerName}</h2>
-                <div className="products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '24px' }}>
-                  {products[sellerName].map(p => (
-                    <div key={p.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '24px' }}>
-                      <div>
-                        <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-main)' }}>{p.name}</h3>
-                        <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--primary)', marginBottom: '24px' }}>₹{p.price}</div>
-                      </div>
-                      <button className="btn btn--primary" onClick={() => addToCart(p)}>Add to Cart</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      <div className="shop-container">
+        <main className="shop-content">
+          <div className="main-nav-tabs" style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border)', marginBottom: '1.5rem', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+            {['browse', 'orders'].map((tab) => (
+              <button
+                key={tab}
+                className={`btn btn--ghost`}
+                onClick={() => setActiveTab(tab)}
+                style={{ fontSize: '1.05rem', padding: '0.5rem 1rem', borderBottom: activeTab === tab ? '3px solid var(--accent)' : '0', fontWeight: activeTab === tab ? 'bold' : '500', color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+              >
+                {tab === 'browse' ? '🛍️ Browse Catalog' : '📦 My Orders'}
+              </button>
             ))}
-            {Object.keys(products).length === 0 && !loading && (
-              <div className="card empty-state">
-                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>No products available at the moment.</p>
-              </div>
-            )}
           </div>
-        )}
 
-        {activeTab === 'cart' && (
-          <div className="cart-view" style={{ maxWidth: '800px' }}>
-            <h2 style={{ marginBottom: '24px', fontSize: '28px', color: 'var(--text-main)' }}>Shopping Cart</h2>
-            {cart.length === 0 ? (
-              <div className="card empty-state" style={{ padding: '60px', textAlign: 'center' }}>
-                <div style={{ fontSize: '48px', opacity: 0.5, marginBottom: '16px' }}>🛒</div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '18px' }}>Your cart is empty and waiting for items.</p>
-              </div>
-            ) : (
-              <div className="card" style={{ padding: '32px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {cart.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <strong style={{ fontSize: '18px', color: 'var(--text-main)' }}>{item.product.name}</strong>
-                        <span style={{ color: 'var(--text-secondary)' }}>₹{item.product.price} × {item.qty}</span>
+          {activeTab === 'browse' && (
+            <div className="catalog-view" style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+              {Object.keys(products).map(sellerName => (
+                <div key={sellerName}>
+                  <h2 style={{ marginBottom: '20px', fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>🏬 {sellerName}</h2>
+                  <div className="stats-grid">
+                    {products[sellerName].map(p => (
+                      <div key={p.id} className="product-card">
+                        <div className="product-card__emoji">🥗</div>
+                        <div>
+                          <h3 className="product-card__title">{p.name}</h3>
+                          <div className="product-card__price">₹{p.price}</div>
+                        </div>
+                        <div className="product-card__footer">
+                          <button className="btn btn--primary" style={{ width: '100%' }} onClick={() => addToCart(p)}>Add to Cart</button>
+                        </div>
                       </div>
-                      <strong style={{ fontSize: '20px', color: 'var(--text-main)' }}>₹{item.product.price * item.qty}</strong>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {Object.keys(products).length === 0 && !loading && (
+                <div className="order-list__empty">
+                  <span className="order-list__empty-icon">😔</span>
+                  <h3>No products available at the moment.</h3>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'orders' && (
+            <div className="orders-view">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '24px', color: 'var(--text-primary)', fontWeight: '700' }}>Order History</h2>
+                <button className="btn btn--ghost" onClick={fetchMyOrders} title="Refresh">
+                  🔄 Refresh
+                </button>
+              </div>
+              {myOrders.length === 0 ? (
+                <div className="order-list__empty" style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                  <span className="order-list__empty-icon">📦</span>
+                  <h3>You haven't placed any orders yet.</h3>
+                </div>
+              ) : (
+                <div className="order-list">
+                  {myOrders.map(o => (
+                    <div key={o.id} className="order-card">
+                      <div className="order-card__header">
+                        <span className="order-card__id">#{o.id.split('-')[0]}</span>
+                        <span className={`status-badge ${o.status === 'delivered' ? 'btn--accept' : o.status === 'dispatched' ? 'btn--dispatch' : 'btn--ghost'}`} style={{ border: 'none' }}>
+                          <span className="status-dot" style={{ background: 'currentColor' }} />
+                          {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
+                        </span>
+                      </div>
+                      
+                      <div className="order-card__body">
+                        <div className="order-card__product">
+                          <div className="order-card__emoji">📦</div>
+                          <div>
+                            <h3 style={{ margin: 0 }}>{o.product} <span style={{ color: 'var(--accent)' }}>(×{o.quantity})</span></h3>
+                            <p style={{ margin: 0, marginTop: '4px' }}>From: {o.seller?.name || 'Unknown Seller'}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="order-card__meta">
+                          <div>
+                            <span className="meta-label">Total Value</span>
+                            <span className="meta-value">₹{(o.quantity * 50)}</span>
+                          </div>
+                          <div>
+                            <span className="meta-label">Ordered On</span>
+                            <span className="meta-value">{new Date(o.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '24px', fontWeight: '800', marginTop: '32px', color: 'var(--text-main)' }}>
-                  <span>Total Payload:</span>
-                  <span style={{ color: 'var(--primary)' }}>₹{cartTotal}</span>
-                </div>
-                <button className="btn btn--primary" style={{ marginTop: '32px', width: '100%', padding: '16px', fontSize: '18px' }} onClick={placeOrder}>Confirm and Place Order</button>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </main>
 
-        {activeTab === 'orders' && (
-          <div className="orders-view" style={{ maxWidth: '800px' }}>
-            <h2 style={{ marginBottom: '24px', fontSize: '28px', color: 'var(--text-main)' }}>Order History</h2>
-            {myOrders.length === 0 ? (
-              <div className="card empty-state" style={{ padding: '60px', textAlign: 'center' }}>
-                <div style={{ fontSize: '48px', opacity: 0.5, marginBottom: '16px' }}>📦</div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '18px' }}>You haven't placed any orders yet.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {myOrders.map(o => (
-                  <div key={o.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px' }}>
-                    <div>
-                      <strong style={{ fontSize: '18px', color: 'var(--text-main)' }}>{o.product} <span style={{ color: 'var(--primary)' }}>(×{o.quantity})</span></strong>
-                      <div style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>From: {o.seller?.name || 'Unknown Seller'}</div>
-                      <div style={{ color: 'var(--text-secondary)', marginTop: '4px', fontSize: '14px' }}>{new Date(o.created_at).toLocaleDateString()}</div>
+        <aside className="cart-sidebar">
+          <div className="cart-sidebar__header">
+            <span>🛒 Your Cart</span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{cart.length} items</span>
+          </div>
+          
+          {cart.length === 0 ? (
+            <div className="order-list__empty" style={{ padding: '32px 16px', border: 'none', background: 'transparent' }}>
+              <span className="order-list__empty-icon" style={{ fontSize: '32px', marginBottom: '12px' }}>🛍️</span>
+              <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Your cart is empty.</h3>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto' }}>
+                {cart.map((item, idx) => (
+                  <div key={idx} className="cart-sidebar__item">
+                    <div className="cart-sidebar__item-meta">
+                      <strong>{item.product.name}</strong>
+                      <span>₹{item.product.price} × {item.qty}</span>
                     </div>
-                    <div>
-                      <span className={`status-badge status-badge--${o.status}`}>
-                        {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
-                      </span>
+                    <div className="cart-sidebar__item-price">
+                      ₹{item.product.price * item.qty}
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
-      </main>
+              
+              <div className="cart-sidebar__total">
+                <span>Total</span>
+                <span>₹{cartTotal}</span>
+              </div>
+              <button className="btn btn--primary" style={{ width: '100%', marginTop: '16px' }} onClick={placeOrder}>Place Order</button>
+            </div>
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

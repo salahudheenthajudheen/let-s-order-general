@@ -69,8 +69,10 @@ async function getOrCreateCustomer(
     .from("customers")
     .select("*")
     .eq("telegram_id", telegramId)
+    .maybeSingle();
+    
   if (data) {
-    if (name && data.name.startsWith("User ")) {
+    if (name && data.name && data.name.startsWith("User ")) {
       await supabase.from("customers").update({ name }).eq("telegram_id", telegramId);
       data.name = name;
     }
@@ -204,7 +206,36 @@ async function findProducts(
   }));
 }
 
-// ─── Command Handlers ──────────────────────────────────────────────
+// ─── Flow Handlers ───────────────────────────────────────────────────
+
+async function handleLink(chatId: number, text: string): Promise<void> {
+  const email = text.replace("/link", "").trim();
+  
+  // Basic validation
+  if (!email || !email.includes('@')) {
+    await sendMessage(
+      chatId,
+      "⚠️ *Invalid Input*\n\nPlease provide a valid email address to link your Web Portal account.\n\nExample:\n`/link john@example.com`"
+    );
+    return;
+  }
+  
+  // Update the unused phone column with this email link
+  const { error } = await supabase
+    .from("customers")
+    .update({ phone: email })
+    .eq("telegram_id", chatId);
+    
+  if (error) {
+    console.error("Link err:", error);
+    await sendMessage(chatId, "❌ Failed to link account. Please try again.");
+  } else {
+    await sendMessage(
+      chatId,
+      `🔗 *Account Linked Successfully!*\n\nThis Telegram session is now tied to the Web Portal email:\n*${email}*\n\nYour order histories will now be natively merged.`
+    );
+  }
+}
 
 async function handleStart(chatId: number): Promise<void> {
   const customer = await getOrCreateCustomer(chatId);
@@ -1071,16 +1102,18 @@ Deno.serve(async (req: Request) => {
     // Route by message type
     if (msg.text) {
       const text = msg.text.trim();
+      const lower = text.toLowerCase();
 
       // Bot commands
-      if (text === "/start") await handleStart(chatId);
-      else if (text === "/role") await handleRoleCommand(chatId);
-      else if (text === "/stats") await handleStats(chatId);
-      else if (text === "/orders") await handleSellerOrders(chatId);
-      else if (text === "/order") await handleOrder(chatId);
-      else if (text === "/status") await handleStatus(chatId);
-      else if (text === "/cancel") await handleCancel(chatId);
-      else if (text === "/help") await handleHelp(chatId);
+      if (lower === "/start") await handleStart(chatId);
+      else if (lower.startsWith("/link")) await handleLink(chatId, text);
+      else if (lower === "/role") await handleRoleCommand(chatId);
+      else if (lower === "/stats") await handleStats(chatId);
+      else if (lower === "/orders") await handleSellerOrders(chatId);
+      else if (lower === "/order") await handleOrder(chatId);
+      else if (lower === "/status") await handleStatus(chatId);
+      else if (lower === "/cancel") await handleCancel(chatId);
+      else if (lower === "/help") await handleHelp(chatId);
       else await handleText(chatId, text);
     } else if (msg.voice) {
       await handleVoice(chatId, msg.voice.file_id);
