@@ -670,3 +670,144 @@ body {
   width: 16px;
   height: 16px;
 }
+
+/* ─── Luminous Logic Aesthetic (Consumer Dashboard) ───────────── */
+.luminous-theme {
+  --lum-primary: #0050d4;
+  --lum-primary-container: #7b9cff;
+  --lum-surface: #f8f5ff;
+  --lum-surface-low: #f1efff;
+  --lum-surface-lowest: #ffffff;
+  --lum-text-main: #282b51;
+  --lum-text-secondary: #555881;
+  --lum-border: rgba(167, 170, 215, 0.4);
+  
+  background-color: var(--lum-surface);
+  color: var(--lum-text-main);
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+  margin: -24px; /* offset dashboard root padding if needed */
+}
+.luminous-theme h1, .luminous-theme h2, .luminous-theme h3 {
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: -0.02em;
+  color: var(--lum-text-main);
+  margin: 0;
+}
+.luminous-header {
+  background: rgba(248, 245, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--lum-border);
+  padding: 20px 32px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.luminous-header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--lum-primary);
+}
+.luminous-tabs {
+  display: flex;
+  gap: 16px;
+  padding: 16px 32px;
+  background: var(--lum-surface-low);
+  border-bottom: 1px solid var(--lum-border);
+}
+.luminous-tab {
+  padding: 10px 20px;
+  border-radius: 99px;
+  background: transparent;
+  color: var(--lum-text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.luminous-tab.active {
+  background: var(--lum-surface-lowest);
+  color: var(--lum-primary);
+  box-shadow: 0 4px 12px rgba(40, 43, 81, 0.04);
+}
+.luminous-content {
+  padding: 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.luminous-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 32px;
+}
+.luminous-card {
+  background: var(--lum-surface-lowest);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(40, 43, 81, 0.04), 0 16px 32px rgba(40, 43, 81, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgba(167, 170, 215, 0.15);
+}
+.luminous-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(40, 43, 81, 0.06), 0 24px 48px rgba(40, 43, 81, 0.12);
+}
+.luminous-price {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--lum-primary);
+  margin-top: 8px;
+}
+.luminous-btn {
+  background: linear-gradient(135deg, var(--lum-primary), var(--lum-primary-container));
+  color: white;
+  border: none;
+  border-radius: 99px;
+  padding: 14px 24px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: auto;
+  transition: transform 0.1s;
+  box-shadow: 0 4px 12px rgba(0, 80, 212, 0.2);
+}
+.luminous-btn:hover {
+  transform: scale(1.02);
+}
+.luminous-btn:active {
+  transform: scale(0.98);
+}
+.luminous-cart-view {
+  background: var(--lum-surface-lowest);
+  border-radius: 32px;
+  padding: 40px;
+  max-width: 600px;
+  margin: 0 auto;
+  box-shadow: 0 16px 40px rgba(40, 43, 81, 0.08);
+  border: 1px solid rgba(167, 170, 215, 0.15);
+}
+.luminous-cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--lum-border);
+}
+.luminous-order-item {
+  background: var(--lum-surface-lowest);
+  padding: 24px;
+  border-radius: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(167, 170, 215, 0.15);
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(40, 43, 81, 0.02);
+}
